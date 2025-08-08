@@ -1,6 +1,5 @@
 import os
 import datetime
-import pickle
 import numpy as np
 
 # Use TensorFlow's bundled Keras implementation to avoid relying on the
@@ -30,8 +29,10 @@ from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 
+from feature_utils import load_or_generate_features
+
 #set_session(session)
-features = pickle.load(open("featsV-1.pkl", "rb"))
+features = load_or_generate_features()
 print(len(features))
 tokenizer = Tokenizer(filters='', split=" ", lower=False)
 

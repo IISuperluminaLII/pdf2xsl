@@ -1,6 +1,5 @@
 import os
 import datetime
-import pickle
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -11,10 +10,12 @@ from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.optimizers import RMSprop
 
+from feature_utils import load_or_generate_features
+
 # ================================================================
 # Data loading
 # ================================================================
-features = pickle.load(open("featsV-1.pkl", "rb"))
+features = load_or_generate_features()
 tokenizer = Tokenizer(filters='', split=" ", lower=False)
 
 # Read XSL training data
