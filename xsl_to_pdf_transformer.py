@@ -49,7 +49,13 @@ class TransformerBlock(layers.Layer):
 
 
 def build_model(maxlen: int, vocab_size: int, layout_vocab: int) -> Model:
-    """Create a style‑conditioned Transformer for XSL → PDF layout."""
+    """Create a style‑conditioned Transformer for XSL → PDF layout.
+
+    Inspired by the LayoutTransformer architecture (Gupta et al., 2020
+    https://arxiv.org/abs/2004.10257) the model encodes an XSL token
+    sequence and fuses it with a CNN style embedding of a reference PDF
+    page via cross‑attention before predicting layout tokens.
+    """
 
     # Encode XSL tokens
     xsl_input = layers.Input(shape=(maxlen,), name="xsl_tokens")
@@ -62,10 +68,14 @@ def build_model(maxlen: int, vocab_size: int, layout_vocab: int) -> Model:
     base_cnn.trainable = False
     style_feat = base_cnn(style_input)
     style_feat = layers.Dense(256, activation="relu")(style_feat)
-    style_feat = layers.RepeatVector(maxlen)(style_feat)
+    style_feat = layers.Reshape((1, 256))(style_feat)
 
-    # Combine style and content, then decode into layout tokens
-    combined = layers.Concatenate()([x, style_feat])
+    # Cross‑attention to inject style context into the token sequence
+    attn = layers.MultiHeadAttention(num_heads=4, key_dim=256)
+    style_context = attn(query=x, value=style_feat, key=style_feat)
+
+    # Combine style context with token embeddings then decode
+    combined = layers.Concatenate()([x, style_context])
     combined = TransformerBlock(512, 8, 1024)(combined)
     combined = layers.GlobalAveragePooling1D()(combined)
     layout_output = layers.Dense(layout_vocab, activation="softmax", name="layout_token")(combined)
@@ -75,19 +85,34 @@ def build_model(maxlen: int, vocab_size: int, layout_vocab: int) -> Model:
     return model
 
 
-def tokens_to_pdf(layout_tokens, pdf_path: str):
-    """Render layout tokens into a styled PDF using fpdf2."""
+def tokens_to_pdf(layout_tokens, pdf_path: str, font_path: str = "DejaVuSans.ttf"):
+    """Render layout tokens into a styled PDF using fpdf2.
+
+    Embeds a TrueType font to prevent the empty/single box issue often seen
+    when the viewer substitutes fonts without glyph coverage.  See the
+    fpdf2 Unicode guide: https://pyfpdf.github.io/fpdf2/Unicode.html.
+    """
+
     try:
         from fpdf import FPDF
     except Exception:  # pragma: no cover - library is optional for compilation
         return
+
     pdf = FPDF()
     pdf.add_page()
+
+    if os.path.exists(font_path):
+        pdf.add_font("DejaVu", "", font_path, uni=True)
+        pdf.set_font("DejaVu", size=12)
+    else:
+        pdf.set_font("Helvetica", size=12)
+
     for token in layout_tokens:
         text = token.get("text", "")
         x = token.get("x", 10)
         y = token.get("y", 10)
         pdf.text(x, y, text)
+
     pdf.output(pdf_path)
 
 
@@ -109,3 +134,11 @@ if __name__ == "__main__":
 
     model = build_model(maxlen, len(tokenizer.word_index) + 1, layout_vocab)
     model.fit([sequences, dummy_images], dummy_layout, epochs=1)
+
+    # Dummy inference to demonstrate PDF rendering
+    preds = model.predict([sequences, dummy_images])
+    sample_tokens = [
+        {"text": f"class_{np.argmax(p)}", "x": 15 + i * 10, "y": 20 + i * 10}
+        for i, p in enumerate(preds)
+    ]
+    tokens_to_pdf(sample_tokens, "sample_output.pdf")
