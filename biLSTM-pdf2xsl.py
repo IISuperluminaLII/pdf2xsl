@@ -93,7 +93,8 @@ model = Model(inputs=[visual_input, language_input], outputs=decoder)
 optimizer = RMSprop(lr=0.0001, clipvalue=1.0)
 model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-filepath = "futeweights\/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
+os.makedirs("futureweights", exist_ok=True)
+filepath = "futureweights/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='loss', verbose=1, save_best_only=True, mode='auto')
 
 tensorboard = TensorBoard(log_dir=("tuber\/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "/"),
