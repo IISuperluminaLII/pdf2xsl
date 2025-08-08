@@ -2,24 +2,40 @@ import os
 import datetime
 import pickle
 import numpy as np
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
-from keras.utils import to_categorical
-from keras.layers import Embedding, RepeatVector, CuDNNLSTM, concatenate, Input, Bidirectional
-from keras.preprocessing.image import img_to_array, load_img
-from keras.applications.inception_resnet_v2 import InceptionResNetV2, preprocess_input
-from keras.models import Model, Sequential
-from keras.layers.core import Dense, Dropout, Flatten
-from keras.layers.convolutional import Conv2D
-from keras.optimizers import RMSprop
-from keras.callbacks import ModelCheckpoint, TensorBoard
+
+# Use TensorFlow's bundled Keras implementation to avoid relying on the
+# deprecated standalone ``keras`` package.  This improves compatibility with
+# modern CPU-only environments where ``CuDNNLSTM`` is unavailable.
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.layers import (
+    Embedding,
+    RepeatVector,
+    concatenate,
+    Input,
+    Bidirectional,
+    Dense,
+    Dropout,
+    Flatten,
+    Conv2D,
+)
+from tensorflow.compat.v1.keras.layers import CuDNNLSTM
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
+from tensorflow.keras.applications.inception_resnet_v2 import (
+    InceptionResNetV2,
+    preprocess_input,
+)
+from tensorflow.keras.models import Model, Sequential
+from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 
 #set_session(session)
 features = pickle.load(open("featsV-1.pkl", "rb"))
 print(len(features))
 tokenizer = Tokenizer(filters='', split=" ", lower=False)
 
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def load_doc(fn):
     file = open(fn, 'r')
@@ -90,7 +106,7 @@ decoder = Dense(vocab_size, activation='softmax')(decoder)
 
 # Compile the model
 model = Model(inputs=[visual_input, language_input], outputs=decoder)
-optimizer = RMSprop(lr=0.0001, clipvalue=1.0)
+optimizer = RMSprop(learning_rate=0.0001, clipvalue=1.0)
 model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
 os.makedirs("futureweights", exist_ok=True)
